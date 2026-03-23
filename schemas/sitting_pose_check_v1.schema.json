@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sitting_pose_check_v1.schema.json",
+  "title": "Sitting Pose Checker Output",
+  "type": "object",
+  "required": ["score", "checks", "failures"],
+  "properties": {
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "checks": {
+      "type": "object",
+      "required": [
+        "hip_on_seat",
+        "knees_in_front_of_hip",
+        "ankles_below_seat_near_floor",
+        "limb_ordering_consistent"
+      ],
+      "properties": {
+        "hip_on_seat": {
+          "type": "integer",
+          "enum": [0, 1]
+        },
+        "knees_in_front_of_hip": {
+          "type": "integer",
+          "enum": [0, 1]
+        },
+        "ankles_below_seat_near_floor": {
+          "type": "integer",
+          "enum": [0, 1]
+        },
+        "limb_ordering_consistent": {
+          "type": "integer",
+          "enum": [0, 1]
+        }
+      },
+      "additionalProperties": false
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

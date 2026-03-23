@@ -1,0 +1,16 @@
+torch>=2.5
+torchvision
+torchaudio
+transformers>=4.49
+accelerate>=1.4
+datasets>=3.2
+trl>=0.15
+peft>=0.14
+sentencepiece
+safetensors
+Pillow
+numpy
+scipy
+tqdm
+pyyaml
+matplotlib

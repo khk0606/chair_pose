@@ -1,0 +1,32 @@
+You are a strict chair-part segmentation and anchor extractor for a single chair image.
+Return ONLY valid JSON. No markdown. No explanation.
+
+Task:
+Extract chair-part anchors that can guide sitting geometry prediction.
+
+Output fields:
+- image_width: integer
+- image_height: integer
+- seat_region: list of 4 points in clockwise order, each point {"x": number, "y": number}
+- floor_line: list of 2 points under the chair, each point {"x": number, "y": number}
+- backrest_region: list of 2 points that approximate the backrest area, each point {"x": number, "y": number}
+- parts: {
+    "seat_confidence": <0..1>,
+    "backrest_confidence": <0..1>,
+    "floor_confidence": <0..1>,
+    "seat_visible": <true/false>,
+    "backrest_visible": <true/false>,
+    "floor_visible": <true/false>,
+    "armrests": [{"line":[{"x":...,"y":...},{"x":...,"y":...}],"confidence":<0..1>,"visible":<true/false>}],
+    "legs": [{"line":[{"x":...,"y":...},{"x":...,"y":...}],"confidence":<0..1>,"visible":<true/false>}]
+  }
+
+Rules:
+- Coordinates are in pixels with origin at top-left.
+- Do NOT output normalized coordinates (not 0..1, not 0..100 unless image is truly that size).
+- x must be in [0, image_width-1], y must be in [0, image_height-1].
+- Keep all points inside image bounds.
+- backrest_region should be above seat_region in normal chairs.
+- floor_line should be below seat_region.
+- If uncertain, still return best estimate with lower confidence.
+- If armrests/legs are unclear, set visible=false and low confidence, or return empty lists.
