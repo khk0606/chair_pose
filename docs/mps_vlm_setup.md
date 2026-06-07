@@ -5,20 +5,20 @@ This project includes a reusable setup flow for VLM LoRA fine-tuning on Apple Si
 ## 1) Run setup
 
 ```bash
-cd /Users/ganghyeongyu/Documents/chairpose
+cd /path/to/chair_pose
 bash scripts/setup_mps_vlm_env.sh
 ```
 
 ## 2) Activate environment
 
 ```bash
-source /Users/ganghyeongyu/Documents/chairpose/.venv-mps-vlm/bin/activate
+source .venv-mps-vlm/bin/activate
 ```
 
 ## 3) Validate
 
 ```bash
-python /Users/ganghyeongyu/Documents/chairpose/scripts/check_mps_vlm_env.py
+python scripts/check_mps_vlm_env.py
 ```
 
 Expected:

@@ -1,18 +1,28 @@
 .DS_Store
+.env
+.env.*
 
 .venv-mps-vlm/
 .venv-mps-vlm.broken_*/
 .vscode/
+.idea/
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
 
 runs/
 runs_2/
 data/
 image/
+models/
 
 *.pt
 *.pth
 *.safetensors
 
 *.log
+
+# Local working notes that contain machine-specific paths and experiment history.
+docs/chairpose_notion_master_summary_ko.md
+docs/codex_handover_full_ko.md

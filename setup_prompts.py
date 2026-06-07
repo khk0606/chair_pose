@@ -1,4 +1,5 @@
-import os
+import argparse
+from pathlib import Path
 
 # 프롬프트 내용 정의
 prompts = {
@@ -267,13 +268,35 @@ Hard constraints:
 - all coordinates must be inside image bounds."""
 }
 
-base_dir = "prompts"
-if not os.path.exists(base_dir):
-    os.makedirs(base_dir)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Create the project prompt files.")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(__file__).resolve().parent / "prompts",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite prompt files that already exist.",
+    )
+    return parser.parse_args()
 
-for filename, content in prompts.items():
-    with open(os.path.join(base_dir, filename), "w", encoding="utf-8") as f:
-        f.write(content)
-    print(f"Created: {filename}")
 
-print("\n 모든 프롬프트 파일 생성 완료!")
+def main() -> int:
+    args = parse_args()
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    for filename, content in prompts.items():
+        output_path = args.output_dir / filename
+        if output_path.exists() and not args.force:
+            print(f"Skipped existing: {filename}")
+            continue
+        output_path.write_text(content + "\n", encoding="utf-8")
+        print(f"Created: {filename}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

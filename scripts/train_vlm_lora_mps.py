@@ -19,6 +19,9 @@ except Exception:  # pragma: no cover
     from transformers import AutoModelForVision2Seq as AutoVLMModel  # type: ignore
 
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train VLM LoRA on Apple Silicon MPS using chat-format JSONL dataset."
@@ -32,21 +35,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--train-jsonl",
         type=Path,
-        default=Path(
-            "/Users/ganghyeongyu/Documents/chairpose/data/vlm_seatcontact/train.jsonl"
-        ),
+        default=REPO_ROOT / "data" / "vlm_seatcontact" / "train.jsonl",
     )
     parser.add_argument(
         "--val-jsonl",
         type=Path,
-        default=Path(
-            "/Users/ganghyeongyu/Documents/chairpose/data/vlm_seatcontact/val.jsonl"
-        ),
+        default=REPO_ROOT / "data" / "vlm_seatcontact" / "val.jsonl",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Documents/chairpose/runs/vlm_lora_mps"),
+        default=REPO_ROOT / "runs" / "vlm_lora_mps",
     )
     parser.add_argument("--epochs", type=float, default=5.0)
     parser.add_argument("--lr", type=float, default=2e-4)

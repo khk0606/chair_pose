@@ -20,6 +20,9 @@ import numpy as np
 from PIL import Image
 
 
+REPO_ROOT = Path(__file__).resolve().parent
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build seat-focused YOLO-seg dataset from LabelMe JSON."
@@ -27,13 +30,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--src-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/images"),
+        default=REPO_ROOT / "data" / "labelme",
         help="Directory containing LabelMe JSON and source images.",
     )
     parser.add_argument(
         "--out-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/seat_contact_yolo_seatfocus_v1"),
+        default=REPO_ROOT / "data" / "seat_contact_yolo_seatfocus",
         help="Output YOLO dataset root.",
     )
     parser.add_argument(

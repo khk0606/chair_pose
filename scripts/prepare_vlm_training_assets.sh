@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${ROOT_DIR}/.venv-mps-vlm"
 OUT_DIR="${ROOT_DIR}/data/vlm_seatcontact"
 
-SRC_A="/Users/ganghyeongyu/Desktop/chair_dataset"
-SRC_B="/Users/ganghyeongyu/Desktop/chair_dataset/v2"
+SRC_A="${SRC_A:-${HOME}/Desktop/chair_dataset}"
+SRC_B="${SRC_B:-${SRC_A}/v2}"
 
 if [[ ! -d "${VENV_DIR}" ]]; then
   echo "[error] venv missing: ${VENV_DIR}"
@@ -17,6 +17,12 @@ fi
 source "${VENV_DIR}/bin/activate"
 
 echo "[prepare] build VLM dataset"
+if [[ ! -d "${SRC_A}" ]]; then
+  echo "[error] dataset directory not found: ${SRC_A}"
+  echo "Set SRC_A=/path/to/chair_dataset and run again."
+  exit 1
+fi
+
 python "${ROOT_DIR}/scripts/build_vlm_dataset_from_labelme.py" \
   --src-dir "${SRC_A}" \
   --src-dir "${SRC_B}" \

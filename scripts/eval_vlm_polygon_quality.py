@@ -13,6 +13,8 @@ from PIL import Image, ImageDraw
 from peft import PeftModel
 from transformers import AutoProcessor
 
+from build_vlm_dataset_from_labelme import resolve_target_key, resolve_task_name
+
 try:
     from transformers import AutoModelForImageTextToText as AutoVLMModel
 except Exception:  # pragma: no cover
@@ -38,6 +40,35 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-samples", type=int, default=0)
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--device", type=str, default="auto", choices=["auto", "mps", "cpu"])
+    parser.add_argument(
+        "--task-name",
+        type=str,
+        default="seat_contact_segmentation_points",
+        help="Exact task string expected in predicted/ground-truth JSON.",
+    )
+    parser.add_argument(
+        "--expected-points",
+        type=int,
+        default=0,
+        help="If >0, require exactly this many points in seat_contact_polygon.",
+    )
+    parser.add_argument(
+        "--target-shape",
+        type=str,
+        default="polygon",
+        choices=["polygon", "quad", "bbox"],
+    )
+    parser.add_argument(
+        "--coord-mode",
+        type=str,
+        default="pixel",
+        choices=["pixel", "grid"],
+    )
+    parser.add_argument(
+        "--target-key",
+        type=str,
+        default="seat_contact_polygon",
+    )
     return parser.parse_args()
 
 
@@ -70,7 +101,7 @@ def resolve_device(spec: str) -> str:
     return "cpu"
 
 
-def extract_json_object(text: str) -> dict[str, Any] | None:
+def extract_json_object(text: str, target_key: str = "seat_contact_polygon") -> dict[str, Any] | None:
     text = text.strip()
     try:
         obj = json.loads(text)
@@ -80,16 +111,34 @@ def extract_json_object(text: str) -> dict[str, Any] | None:
         pass
 
     decoder = json.JSONDecoder()
+    best_obj: dict[str, Any] | None = None
+    best_score = -1
+    best_span = -1
     start = text.find("{")
     while start != -1:
         try:
-            obj, _ = decoder.raw_decode(text[start:])
+            obj, end = decoder.raw_decode(text[start:])
             if isinstance(obj, dict):
-                return obj
+                keys = set(obj.keys())
+                expected_keys = {"task", "image_size", target_key}
+                relevant_key_count = len(expected_keys & keys)
+                if expected_keys.issubset(keys):
+                    score = 3
+                elif relevant_key_count >= 2:
+                    score = 2
+                else:
+                    score = 1
+                span = int(end)
+                if score > best_score or (score == best_score and span > best_span):
+                    best_obj = obj
+                    best_score = score
+                    best_span = span
         except Exception:
             pass
         start = text.find("{", start + 1)
-    return None
+    if best_score < 2:
+        return None
+    return best_obj
 
 
 def parse_numeric(value: Any) -> float | None:
@@ -140,17 +189,59 @@ def normalize_points(poly: Any, width: int, height: int) -> list[tuple[float, fl
     return pts
 
 
+def normalize_box(box: Any, width: int, height: int) -> dict[str, float] | None:
+    if not isinstance(box, dict):
+        return None
+    required = {"x_min", "y_min", "x_max", "y_max"}
+    if set(box.keys()) != required:
+        return None
+    x_min = parse_numeric(box.get("x_min"))
+    y_min = parse_numeric(box.get("y_min"))
+    x_max = parse_numeric(box.get("x_max"))
+    y_max = parse_numeric(box.get("y_max"))
+    if None in {x_min, y_min, x_max, y_max}:
+        return None
+    assert x_min is not None and y_min is not None and x_max is not None and y_max is not None
+    x_min = min(max(x_min, 0.0), float(max(0, width - 1)))
+    y_min = min(max(y_min, 0.0), float(max(0, height - 1)))
+    x_max = min(max(x_max, 0.0), float(max(0, width - 1)))
+    y_max = min(max(y_max, 0.0), float(max(0, height - 1)))
+    if x_max <= x_min or y_max <= y_min:
+        return None
+    return {
+        "x_min": float(x_min),
+        "y_min": float(y_min),
+        "x_max": float(x_max),
+        "y_max": float(y_max),
+    }
+
+
+def box_to_polygon(box: dict[str, float]) -> list[tuple[float, float]]:
+    return [
+        (float(box["x_min"]), float(box["y_min"])),
+        (float(box["x_max"]), float(box["y_min"])),
+        (float(box["x_max"]), float(box["y_max"])),
+        (float(box["x_min"]), float(box["y_max"])),
+    ]
+
+
 def has_placeholder_pattern(text: str) -> bool:
     low = text.lower()
     tokens = ["...", "100%", "\"int\"", "\"float\"", "<x>", "<y>"]
     return any(t in low for t in tokens)
 
 
-def is_schema_valid(obj: dict[str, Any]) -> bool:
-    required = {"task", "image_size", "seat_contact_polygon"}
+def is_schema_valid(
+    obj: dict[str, Any],
+    task_name: str,
+    expected_points: int,
+    target_shape: str,
+    target_key: str,
+) -> bool:
+    required = {"task", "image_size", target_key}
     if set(obj.keys()) != required:
         return False
-    if obj.get("task") != "seat_contact_segmentation_points":
+    if obj.get("task") != task_name:
         return False
     image_size = obj.get("image_size")
     if not isinstance(image_size, dict):
@@ -161,11 +252,17 @@ def is_schema_valid(obj: dict[str, Any]) -> bool:
     h = parse_positive_int(image_size.get("height"))
     if w is None or h is None:
         return False
-    poly = obj.get("seat_contact_polygon")
+    if target_shape == "bbox":
+        box = normalize_box(obj.get(target_key), int(w), int(h))
+        return box is not None
+
+    poly = obj.get(target_key)
     if not isinstance(poly, list):
         return False
     pts = normalize_points(poly, int(w), int(h))
     if len(pts) < 3:
+        return False
+    if expected_points > 0 and len(pts) != expected_points:
         return False
     return True
 
@@ -217,6 +314,12 @@ def main() -> int:
     if not args.jsonl.exists():
         raise FileNotFoundError(f"jsonl not found: {args.jsonl}")
     base_model_name = resolve_base_model_name(args.base_model, args.adapter_dir)
+    task_name = str(args.task_name)
+    if task_name == "seat_contact_segmentation_points":
+        task_name = resolve_task_name(str(args.target_shape), str(args.coord_mode))
+    target_key = str(args.target_key)
+    if target_key == "seat_contact_polygon":
+        target_key = resolve_target_key(str(args.target_shape))
 
     device = resolve_device(args.device)
     dtype = torch.float16 if device == "mps" else torch.float32
@@ -251,7 +354,11 @@ def main() -> int:
         gt_obj = json.loads(row["messages"][-1]["content"][0]["text"])
         gt_w = int(gt_obj["image_size"]["width"])
         gt_h = int(gt_obj["image_size"]["height"])
-        gt_pts = normalize_points(gt_obj["seat_contact_polygon"], gt_w, gt_h)
+        if str(args.target_shape) == "bbox":
+            gt_box = normalize_box(gt_obj.get(target_key), gt_w, gt_h)
+            gt_pts = box_to_polygon(gt_box) if gt_box is not None else []
+        else:
+            gt_pts = normalize_points(gt_obj.get(target_key, []), gt_w, gt_h)
 
         messages = [
             {"role": "system", "content": row["messages"][0]["content"]},
@@ -277,9 +384,15 @@ def main() -> int:
         )[0].strip()
 
         placeholder = has_placeholder_pattern(pred_text)
-        pred_obj = extract_json_object(pred_text)
+        pred_obj = extract_json_object(pred_text, target_key=target_key)
         valid_json = pred_obj is not None
-        schema_valid = valid_json and is_schema_valid(pred_obj)
+        schema_valid = valid_json and is_schema_valid(
+            pred_obj,
+            task_name=task_name,
+            expected_points=int(args.expected_points),
+            target_shape=str(args.target_shape),
+            target_key=target_key,
+        )
         pred_pts: list[tuple[float, float]] = []
         iou = 0.0
         if valid_json:
@@ -300,18 +413,20 @@ def main() -> int:
                 pred_w = int(gt_w)
                 pred_h = int(gt_h)
 
-            pred_pts_src = normalize_points(
-                pred_obj.get("seat_contact_polygon", []),
-                int(pred_w),
-                int(pred_h),
-            )
-            pred_pts = scale_points(
-                pred_pts_src,
-                int(pred_w),
-                int(pred_h),
-                int(gt_w),
-                int(gt_h),
-            )
+            if str(args.target_shape) == "bbox":
+                pred_box = normalize_box(
+                    pred_obj.get(target_key),
+                    int(pred_w),
+                    int(pred_h),
+                )
+                pred_pts_src = box_to_polygon(pred_box) if pred_box is not None else []
+            else:
+                pred_pts_src = normalize_points(
+                    pred_obj.get(target_key, []),
+                    int(pred_w),
+                    int(pred_h),
+                )
+            pred_pts = scale_points(pred_pts_src, int(pred_w), int(pred_h), int(gt_w), int(gt_h))
             if len(pred_pts) < 3:
                 schema_valid = False
             iou = polygon_iou(pred_pts, gt_pts, gt_w, gt_h)
@@ -328,6 +443,8 @@ def main() -> int:
                 "schema_valid": bool(schema_valid),
                 "has_placeholder_pattern": bool(placeholder),
                 "pred_points": len(pred_pts),
+                "target_shape": str(args.target_shape),
+                "target_key": target_key,
                 "pred_points_xy": [
                     {"x": float(x), "y": float(y)} for x, y in pred_pts
                 ],
@@ -345,6 +462,10 @@ def main() -> int:
         "adapter_dir": str(args.adapter_dir),
         "jsonl": str(args.jsonl),
         "num_samples": len(samples),
+        "task_name": task_name,
+        "expected_points": int(args.expected_points),
+        "target_shape": str(args.target_shape),
+        "target_key": target_key,
         "valid_json_rate": valid_json_count / len(samples),
         "schema_valid_rate": schema_valid_count / len(samples),
         "placeholder_rate": placeholder_count / len(samples),

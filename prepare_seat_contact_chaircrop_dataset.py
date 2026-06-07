@@ -24,6 +24,9 @@ from PIL import Image
 from ultralytics import YOLO  # type: ignore
 
 
+REPO_ROOT = Path(__file__).resolve().parent
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build chair-cropped YOLO-seg dataset from LabelMe JSON."
@@ -31,13 +34,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--src-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/images"),
+        default=REPO_ROOT / "data" / "labelme",
         help="Directory containing LabelMe JSON and source images.",
     )
     parser.add_argument(
         "--out-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/seat_contact_yolo_crop_v2"),
+        default=REPO_ROOT / "data" / "seat_contact_yolo_crop",
         help="Output YOLO dataset root.",
     )
     parser.add_argument(

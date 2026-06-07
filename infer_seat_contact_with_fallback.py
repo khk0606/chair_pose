@@ -3,12 +3,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent
+RUNTIME_CACHE_ROOT = REPO_ROOT / "runs" / ".runtime_cache"
+RUNTIME_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("YOLO_CONFIG_DIR", str(RUNTIME_CACHE_ROOT / "ultralytics"))
+os.environ.setdefault("MPLCONFIGDIR", str(RUNTIME_CACHE_ROOT / "matplotlib"))
+os.environ.setdefault("XDG_CACHE_HOME", str(RUNTIME_CACHE_ROOT / "xdg"))
 
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw
 from ultralytics import YOLO  # type: ignore
+
+DEFAULT_SEAT_MODEL = (
+    REPO_ROOT / "models" / "seat_contact_best.pt"
+)
+DEFAULT_CHAIR_DETECTOR = Path("yolov8x-seg.pt")
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,11 +34,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--seat-model",
         type=Path,
-        default=Path(
-            "/Users/ganghyeongyu/Desktop/chair_dataset_fresh_models/seat_contact_fullseat_v2_plus_hard_v2_finetune1_best.pt"
-        ),
+        default=DEFAULT_SEAT_MODEL,
     )
-    parser.add_argument("--chair-detector", type=str, default="yolov8x-seg.pt")
+    parser.add_argument("--chair-detector", type=str, default=str(DEFAULT_CHAIR_DETECTOR))
     parser.add_argument(
         "--chair-gate-mode",
         type=str,

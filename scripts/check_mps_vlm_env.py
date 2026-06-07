@@ -45,6 +45,10 @@ def main() -> int:
         "datasets",
         "trl",
         "peft",
+        "PIL",
+        "numpy",
+        "cv2",
+        "ultralytics",
     ]
 
     imports: dict[str, dict[str, str | bool]] = {}

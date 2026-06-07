@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 
 
+REPO_ROOT = Path(__file__).resolve().parent
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train seat-contact segmentation model (YOLO-seg)."
@@ -19,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/seat_contact_yolo_v1/dataset.yaml"),
+        default=REPO_ROOT / "data" / "seat_contact_yolo" / "dataset.yaml",
         help="Path to Ultralytics dataset.yaml",
     )
     parser.add_argument(
@@ -61,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--project",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/training_runs"),
+        default=REPO_ROOT / "runs" / "yolo",
         help="Output project dir (Ultralytics)",
     )
     parser.add_argument(
@@ -73,9 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--copy-best-to",
         type=Path,
-        default=Path(
-            "/Users/ganghyeongyu/Desktop/chair_dataset/models/seat_contact_yolov8s_seg_v1_best.pt"
-        ),
+        default=REPO_ROOT / "models" / "seat_contact_yolov8s_seg_v1_best.pt",
         help="Copy trained best.pt to this path",
     )
     parser.add_argument("--optimizer", type=str, default="auto", help="Optimizer: auto|AdamW|SGD")

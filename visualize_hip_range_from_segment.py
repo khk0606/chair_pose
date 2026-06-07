@@ -11,6 +11,9 @@ import cv2
 import numpy as np
 
 
+REPO_ROOT = Path(__file__).resolve().parent
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -28,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Documents/chairpose/runs"),
+        default=REPO_ROOT / "runs",
         help="Directory to write hip-range JSON and overlay images.",
     )
     parser.add_argument(

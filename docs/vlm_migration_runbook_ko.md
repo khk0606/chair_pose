@@ -1,188 +1,113 @@
-# VLM 파인튜닝 이전/복구 런북 (맥북 간 이동용)
+# VLM 작업 환경 이전 런북
 
-이 문서는 `chairpose` 프로젝트를 다른 노트북으로 옮겨서, 현재 진행 상태(게이트 체크포인트 포함)부터 다시 학습을 이어가기 위한 상세 가이드다.
+새 Mac 또는 새 작업 디렉터리에서 ChairPose VLM 학습을 재개하기 위한 체크리스트입니다.
 
-## 1) 현재 원본 노트북의 실제 경로
+## 이전할 항목
 
-- `chairpose` 프로젝트 루트  
-  `/Users/ganghyeongyu/Documents/문서 - 강현규의 MacBook Pro/chairpose`
-- 학습 데이터 루트  
-  `/Users/ganghyeongyu/Desktop/데스크탑 - 강현규의 MacBook Pro/chair_dataset`
-- 학습 데이터 v2  
-  `/Users/ganghyeongyu/Desktop/데스크탑 - 강현규의 MacBook Pro/chair_dataset/v2`
+- Git 저장소
+- LabelMe 원본 이미지와 JSON
+- 필요한 LoRA checkpoint
+- 로컬에서 사용하는 외부 model weight
 
-주의:
-- `MacBook Pro` 사이 공백은 일반 공백이 아니라 NBSP일 수 있다.
-- 경로는 직접 타이핑보다 `복사/붙여넣기` 권장.
+`runs/`, `data/`, `.venv-mps-vlm/`, `*.pt`, `*.safetensors`는 Git에서 제외되므로
+필요한 파일은 별도 저장소나 외장 디스크로 이전해야 합니다.
 
-## 2) 다른 노트북으로 복사할 폴더
-
-최소 권장(현재 게이트 재개 목적):
-- `chairpose` 전체
-- `chair_dataset` 전체
-
-즉, 아래 2개를 통째로 복사:
-- `/Users/ganghyeongyu/Documents/문서 - 강현규의 MacBook Pro/chairpose`
-- `/Users/ganghyeongyu/Desktop/데스크탑 - 강현규의 MacBook Pro/chair_dataset`
-
-왜 전체 복사?
-- 코드 + 스크립트 + 현재 체크포인트 + 로그 + 데이터셋 JSONL 경로 이슈를 한 번에 보존 가능
-- 일부만 복사하면 절대경로, 체크포인트 불일치로 재작업이 늘어남
-
-## 3) 새 노트북에서 권장 폴더 구조
-
-가능하면 아래처럼 맞추는 것이 가장 안전:
-- `~/Documents/chairpose`
-- `~/Desktop/chair_dataset`
-
-정확히 동일 경로가 아니어도 되지만, 실행 시 `SRC_A`, `SRC_B`를 반드시 지정해야 한다.
-
-## 4) 새 노트북 최초 1회 세팅
-
-프로젝트 루트로 이동:
+## 1. 저장소 준비
 
 ```bash
-cd /Users/<YOUR_USER>/Documents/chairpose
+git clone https://github.com/khk0606/chair_pose.git
+cd chair_pose
 ```
 
-가상환경/패키지 설치:
+기존 복사본을 사용한다면 다음을 확인합니다.
+
+```bash
+git status
+git remote -v
+```
+
+## 2. Python 환경 재생성
+
+가상환경 폴더를 복사하지 말고 새 장치에서 다시 만듭니다.
 
 ```bash
 bash scripts/setup_mps_vlm_env.sh
+source .venv-mps-vlm/bin/activate
+python scripts/check_mps_vlm_env.py
 ```
 
-환경 확인:
+`READY: True`와 `mps available=True`를 확인합니다.
+
+## 3. 데이터 위치 지정
+
+데이터셋은 저장소 밖에 둘 수 있습니다.
 
 ```bash
-/Users/<YOUR_USER>/Documents/chairpose/.venv-mps-vlm/bin/python scripts/check_mps_vlm_env.py
+export SRC_A=/path/to/chair_dataset
 ```
 
-정상 기준:
-- `torch/transformers/accelerate/datasets/trl/peft` 모두 OK
-- `mps built=True available=True tensor_test=True`
-- `READY: True`
-
-## 5) 현재 상태에서 게이트 학습 재개 (권장 커맨드)
-
-아래 커맨드는:
-- 이전 `checkpoint-*` 중 최신에서 이어서 시작
-- 게이트 실패 시 자동 스텝 확장 (`20 -> 30 -> ... -> 70`)
-- 프로세스 킬/실패 시 자동 재시도
-
-```bash
-ROOT="/Users/<YOUR_USER>/Documents/chairpose"
-SRC_A="/Users/<YOUR_USER>/Desktop/chair_dataset"
-SRC_B="$SRC_A/v2"
-RUN_TAG="vlm_lora_mps_strict_v4"
-RESUME_CKPT="$(ls -1d "$ROOT/runs/$RUN_TAG/gate"/checkpoint-* 2>/dev/null | sort -V | tail -n 1)"
-
-RUN_TAG="$RUN_TAG" \
-SRC_A="$SRC_A" SRC_B="$SRC_B" \
-GATE_ONLY=1 \
-KEEP_GATE_DIR=1 \
-RESUME_GATE_FROM="$RESUME_CKPT" \
-GATE_STEP_SCHEDULE=20 \
-GATE_AUTO_EXTEND=1 \
-GATE_AUTO_STEP_DELTA=10 \
-GATE_AUTO_MAX_STEPS=70 \
-GATE_TRAIN_RETRIES=5 \
-GATE_RESUME_SCHEDULE_MODE=preserve \
-bash "$ROOT/scripts/retrain_vlm_strict_pipeline.sh" \
-2>&1 | tee "$ROOT/runs/$RUN_TAG/launcher_gate_resume.log"
-```
-
-## 6) 게이트 통과 후 본학습 시작
-
-게이트 통과 로그가 나오면(예: `[gate-pass] quality gate passed`) 다음 실행:
-
-```bash
-ROOT="/Users/<YOUR_USER>/Documents/chairpose"
-SRC_A="/Users/<YOUR_USER>/Desktop/chair_dataset"
-SRC_B="$SRC_A/v2"
-RUN_TAG="vlm_lora_mps_strict_v4"
-BEST_GATE="$(ls -1d "$ROOT/runs/$RUN_TAG/gate"/checkpoint-* | sort -V | tail -n 1)"
-STEP="${BEST_GATE##*-}"
-
-RUN_TAG="$RUN_TAG" \
-SRC_A="$SRC_A" SRC_B="$SRC_B" \
-KEEP_GATE_DIR=1 \
-RESUME_GATE_FROM="$BEST_GATE" \
-GATE_STEP_SCHEDULE="$STEP" \
-USE_GATE_AS_FINAL_START=1 \
-FINAL_RESUME_FROM="$BEST_GATE" \
-bash "$ROOT/scripts/retrain_vlm_strict_pipeline.sh" \
-2>&1 | tee "$ROOT/runs/$RUN_TAG/launcher_full.log"
-```
-
-## 7) 출력 파일/결과 확인 포인트
-
-런 루트:
-- `runs/vlm_lora_mps_strict_v4/`
-
-중요 파일:
-- `launcher_gate_resume.log`: 게이트 재개 전체 로그
-- `gate_eval_val_step*.json`: 게이트 평가 결과
-- `gate/checkpoint-*`: 게이트 체크포인트
-- `final_train.log`: 본학습 로그
-- `best_adapter_selection.json`: val 기준 베스트 어댑터 선택 결과
-- `final_eval_test.json`: 최종 테스트 평가
-
-## 8) 자주 발생한 이슈와 해결
-
-### A. 경로가 있는데 못 찾는 문제
-- 원인: `문서 - ...`, `데스크탑 - ...`처럼 로컬라이즈된 폴더명 + 특수 공백(NBSP)
-- 해결: 경로를 Finder에서 복사해 붙여넣기, 또는 `SRC_A/SRC_B`를 명시 지정
-
-### B. `FileNotFoundError: src-dir not found`
-- 원인: 새 노트북에서 `chair_dataset` 실제 경로 불일치
-- 해결: `SRC_A="/실제/chair_dataset"` `SRC_B="$SRC_A/v2"`로 강제 지정
-
-### C. `Killed: 9`
-- 원인: 보통 메모리/시스템 압박으로 프로세스 강제 종료
-- 완화:
-  - 다른 앱 종료
-  - 디스크 여유 최소 15~20GB 확보
-  - 자동 재시도(`GATE_TRAIN_RETRIES`) 활용
-
-### D. `eval_steps/save_steps mismatch` 경고
-- 원인: 재개 체크포인트의 trainer_state와 현재 인자 불일치
-- 조치: 치명적 오류 아님. 현재 스크립트는 `GATE_RESUME_SCHEDULE_MODE=preserve`로 완화됨
-
-## 9) 다른 노트북 Codex에 붙여넣을 프롬프트 템플릿
-
-아래를 새 노트북 Codex에 그대로 붙여넣고 `<...>`만 바꿔 사용:
+필수 구조:
 
 ```text
-프로젝트를 이어서 진행해야 해.
-
-프로젝트 루트:
-/Users/<YOUR_USER>/Documents/chairpose
-
-데이터셋 루트:
-/Users/<YOUR_USER>/Desktop/chair_dataset
-/Users/<YOUR_USER>/Desktop/chair_dataset/v2
-
-목표:
-1) 환경 점검(venv, mps, 필수 패키지)
-2) runs/vlm_lora_mps_strict_v4의 최신 gate checkpoint 확인
-3) 게이트 학습을 최신 checkpoint에서 재개
-4) 게이트 통과 여부 보고
-5) 통과하면 본학습 명령까지 준비
-
-조건:
-- 경로 자동탐색보다 위 절대경로를 우선 사용
-- 실패 시 원인과 재시도 명령을 바로 제시
-- 로그 파일 경로를 항상 명시
-- 기존 checkpoint는 절대 삭제하지 말 것
+chair_dataset/
+├── sample_001.jpg
+├── sample_001.json
+├── sample_002.png
+└── sample_002.json
 ```
 
-## 10) 빠른 체크리스트
+각 JSON에는 `seat_contact` polygon이 있어야 합니다.
 
-- [ ] `chairpose` 전체 복사 완료
-- [ ] `chair_dataset` 전체 복사 완료
-- [ ] `setup_mps_vlm_env.sh` 실행 완료
-- [ ] `check_mps_vlm_env.py` READY True 확인
-- [ ] `runs/vlm_lora_mps_strict_v4/gate/checkpoint-*` 존재 확인
-- [ ] 게이트 재개 로그 생성 확인 (`launcher_gate_resume.log`)
-- [ ] 게이트 통과 후 본학습 실행
+## 4. 학습 데이터 재생성
 
+```bash
+python scripts/build_vlm_dataset_from_labelme.py \
+  --src-dir "$SRC_A" \
+  --out-dir data/vlm_seatcontact \
+  --label seat_contact \
+  --target-shape bbox \
+  --coord-mode grid \
+  --grid-size 16 \
+  --crop-mode chair \
+  --target-width 224 \
+  --target-height 224 \
+  --write-resized-images
+```
+
+```bash
+python scripts/validate_vlm_jsonl.py \
+  --jsonl data/vlm_seatcontact/train.jsonl \
+  --jsonl data/vlm_seatcontact/val.jsonl \
+  --target-shape bbox \
+  --coord-mode grid
+```
+
+## 5. 체크포인트 복원
+
+백업한 checkpoint를 `runs/<run-name>/gate/checkpoint-<step>` 아래에 배치합니다.
+
+확인할 파일:
+
+- `adapter_config.json`
+- `adapter_model.safetensors`
+- `trainer_state.json`
+- `training_args.bin`
+
+이어 학습하려면:
+
+```bash
+python scripts/train_vlm_lora_mps.py \
+  --model-name HuggingFaceTB/SmolVLM-500M-Instruct \
+  --train-jsonl data/vlm_seatcontact/train.jsonl \
+  --val-jsonl data/vlm_seatcontact/val.jsonl \
+  --output-dir runs/vlm_resume/gate \
+  --resume-from-checkpoint runs/previous/gate/checkpoint-45
+```
+
+## 6. 이전 후 확인
+
+1. 모든 JSONL 이미지 경로가 현재 장치에서 존재하는지 확인합니다.
+2. base model 이름과 adapter의 `base_model_name_or_path`가 일치해야 합니다.
+3. 학습과 추론의 crop, resize, target shape, coordinate mode를 동일하게 유지합니다.
+4. 먼저 dry-run과 단일 이미지 추론을 실행합니다.
+5. validation IoU뿐 아니라 고정 hardcase 결과를 함께 확인합니다.

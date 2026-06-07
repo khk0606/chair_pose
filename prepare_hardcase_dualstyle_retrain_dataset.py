@@ -23,6 +23,9 @@ from PIL import Image, ImageDraw
 from ultralytics import YOLO  # type: ignore
 
 
+REPO_ROOT = Path(__file__).resolve().parent
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Prepare hard-case dual-style dataset for seat_contact retraining."
@@ -30,19 +33,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--src-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/images"),
+        default=REPO_ROOT / "data" / "labelme",
     )
     parser.add_argument(
         "--out-dir",
         type=Path,
-        default=Path("/Users/ganghyeongyu/Desktop/chair_dataset/seat_contact_hardcases_dualstyle_v1"),
+        default=REPO_ROOT / "data" / "seat_contact_hardcases_dualstyle",
     )
     parser.add_argument(
         "--mine-model",
         type=Path,
-        default=Path(
-            "/Users/ganghyeongyu/Desktop/chair_dataset/models/seat_contact_yolov8s_seg_seatfocus_v1_e35_best.pt"
-        ),
+        default=REPO_ROOT / "models" / "seat_contact_best.pt",
         help="Current seat model used to mine hard samples.",
     )
     parser.add_argument("--chair-detector", type=str, default="yolov8x-seg.pt")
