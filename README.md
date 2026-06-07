@@ -1,6 +1,6 @@
 # ChairPose
 
-단일 의자 이미지에서 **사람이 실제로 앉을 수 있는 좌판 영역(seat-contact)**을 찾고,
+단일 의자 이미지에서 사람이 실제로 앉을 수 있는 좌판 영역(seat-contact)을 찾고,
 그 영역을 기준으로 가상의 2D 착석 자세를 추론하는 실험 프로젝트입니다.
 
 현재 연구의 중심은 `SmolVLM + LoRA`를 이용해 의자 이미지에서 좌판 접촉 영역을
@@ -28,7 +28,7 @@ VLM 파인튜닝 도구를 함께 제공합니다.
 - 자세 타당성 검사 결과
 - 이후 2D-to-3D 역추적에 사용할 접촉/기하 정보
 
-의자 전체 segmentation이 아니라 **실제 착석 가능한 표면**을 찾는 것이 핵심입니다.
+의자 전체 segmentation이 아니라 실제 착석 가능한 표면을 찾는 것이 핵심입니다.
 등받이, 다리, 팔걸이, 배경은 seat-contact 영역에 포함하지 않습니다.
 
 ## 전체 파이프라인
@@ -44,7 +44,7 @@ flowchart LR
     G --> H["Future: 2D-to-3D reconstruction"]
 ```
 
-현재 `v18` 실험에서는 COCO chair detector가 **의자 주변 crop만 생성**합니다.
+현재 `v18` 실험에서는 COCO chair detector가 의자 주변 crop만 생성합니다.
 최종 seat-contact 영역은 detector가 아니라 파인튜닝된 VLM이 예측합니다.
 
 ## 주요 기능
